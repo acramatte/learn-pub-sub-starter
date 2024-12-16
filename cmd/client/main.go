@@ -7,9 +7,6 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func main() {
@@ -34,10 +31,38 @@ func main() {
 	}
 	fmt.Printf("Queue %v declared and bound\n", queue.Name)
 
-	// Keep the client running until a termination signal is received
-	fmt.Println("Client is running. Press Ctrl+C to exit.")
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
-	fmt.Println("Shutting down client...")
+	gameState := gamelogic.NewGameState(username)
+
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+		switch words[0] {
+		case "spawn":
+			err := gameState.CommandSpawn(words)
+			if err != nil {
+				fmt.Printf("Error spawning game: %s", err)
+				continue
+			}
+		case "move":
+			armyMove, err := gameState.CommandMove(words)
+			if err != nil {
+				fmt.Printf("Error moving: %s", err)
+				continue
+			}
+			fmt.Printf("move %s %d", armyMove.ToLocation, len(armyMove.Units))
+		case "status":
+			gameState.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			return
+		default:
+			fmt.Printf("Command unknown\n")
+		}
+	}
 }
