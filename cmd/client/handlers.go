@@ -36,8 +36,9 @@ func handlerMove(gs *gamelogic.GameState, channel *amqp.Channel) func(gamelogic.
 			)
 			if err != nil {
 				log.Printf("Error publishing to channel: %v", err)
+				return pubsub.NackRequeue
 			}
-			return pubsub.NackRequeue
+			return pubsub.Ack
 		}
 		return pubsub.NackDiscard
 	}
