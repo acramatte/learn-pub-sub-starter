@@ -7,6 +7,7 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
+	"time"
 )
 
 func handlerPause(gs *gamelogic.GameState) func(state routing.PlayingState) pubsub.AckType {
@@ -44,18 +45,46 @@ func handlerMove(gs *gamelogic.GameState, channel *amqp.Channel) func(gamelogic.
 	}
 }
 
-func handlerWar(gs *gamelogic.GameState) func(war gamelogic.RecognitionOfWar) pubsub.AckType {
+func handlerWar(gs *gamelogic.GameState, channel *amqp.Channel) func(war gamelogic.RecognitionOfWar) pubsub.AckType {
 	return func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
 		defer fmt.Print("> ")
-		outcome, _, _ := gs.HandleWar(rw)
+		outcome, winner, loser := gs.HandleWar(rw)
 		switch outcome {
 		case gamelogic.WarOutcomeNotInvolved:
 			return pubsub.NackRequeue
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.NackDiscard
-		case gamelogic.WarOutcomeOpponentWon:
-		case gamelogic.WarOutcomeYouWon:
+		case gamelogic.WarOutcomeOpponentWon, gamelogic.WarOutcomeYouWon:
+			err := pubsub.PublishGob(
+				channel,
+				routing.ExchangePerilTopic,
+				routing.GameLogSlug+"."+rw.Attacker.Username,
+				routing.GameLog{
+					CurrentTime: time.Now(),
+					Message:     fmt.Sprintf("%s won a war against %s", winner, loser),
+					Username:    gs.GetUsername(),
+				},
+			)
+			if err != nil {
+				log.Printf("Error publishing log to channel: %v", err)
+				return pubsub.NackRequeue
+			}
+			return pubsub.Ack
 		case gamelogic.WarOutcomeDraw:
+			err := pubsub.PublishGob(
+				channel,
+				routing.ExchangePerilTopic,
+				routing.GameLogSlug+"."+rw.Attacker.Username,
+				routing.GameLog{
+					CurrentTime: time.Now(),
+					Message:     fmt.Sprintf("A war between %s and %s resulted in a draw", winner, loser),
+					Username:    gs.GetUsername(),
+				},
+			)
+			if err != nil {
+				log.Printf("Error publishing log to channel: %v", err)
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		}
 		log.Println("error during war recognition")
