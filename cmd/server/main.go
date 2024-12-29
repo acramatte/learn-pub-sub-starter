@@ -25,11 +25,17 @@ func main() {
 		log.Fatalf("Error creating new channel %v", err)
 	}
 
-	_, queue, err := pubsub.DeclareAndBind(connection, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.SimpleQueueDurable)
+	err = pubsub.SubscribeGob(
+		connection,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.SimpleQueueDurable,
+		handleLogs(channel),
+	)
 	if err != nil {
-		log.Fatalf("Could not bind queue to pause: %v", err)
+		log.Fatalf("Could not bind queue to logs: %v", err)
 	}
-	fmt.Printf("Queue %v declared and bound\n", queue.Name)
 
 	gamelogic.PrintServerHelp()
 
