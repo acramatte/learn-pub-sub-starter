@@ -7,6 +7,8 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
+	"strconv"
+	"time"
 )
 
 func main() {
@@ -98,6 +100,23 @@ func main() {
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
+			s, err := strconv.Atoi(words[1])
+			if err != nil {
+				fmt.Printf("error parsing words: %s", err)
+				continue
+			}
+			for _ = range s {
+				maliciousLog := gamelogic.GetMaliciousLog()
+				err := pubsub.PublishGob(channel, routing.ExchangePerilTopic, routing.GameLogSlug+"."+username, routing.GameLog{
+					CurrentTime: time.Now(),
+					Message:     maliciousLog,
+					Username:    username,
+				})
+				if err != nil {
+					fmt.Printf("Error publishing smap: %s", err)
+					continue
+				}
+			}
 			fmt.Println("Spamming not allowed yet!")
 		case "quit":
 			gamelogic.PrintQuit()
